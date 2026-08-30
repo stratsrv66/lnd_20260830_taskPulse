@@ -1,0 +1,42 @@
+name: taskpulse
+
+services:
+  mongo:
+    image: mongo:8
+    container_name: taskpulse-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+    ports:
+      - "127.0.0.1:${MONGO_PORT}:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskpulse-backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/${MONGO_DATABASE}?authSource=admin
+      TASKPULSE_JWT_SECRET: ${TASKPULSE_JWT_SECRET}
+      TASKPULSE_COOKIE_SECURE: ${TASKPULSE_COOKIE_SECURE}
+      TASKPULSE_ALLOWED_ORIGINS: ${TASKPULSE_ALLOWED_ORIGINS}
+      SERVER_PORT: 8080
+    ports:
+      - "${SERVER_PORT}:8080"
+
+volumes:
+  mongo-data:
